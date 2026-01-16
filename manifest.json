@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "LinguaContext - Immersive English Learning",
+  "version": "0.1.0",
+  "description": "Context-aware English learning assistant.",
+  "permissions": [
+    "storage",
+    "identity",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "https://dashscope.aliyuncs.com/*",
+    "https://openspeech.bytedance.com/*"
+  ],
+  "oauth2": {
+    "client_id": "269309597340-hvjgb712pqg3d9ij6tms1d018kn722je.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/drive.appdata"
+    ]
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content-script.js"],
+      "css": ["src/content/styles.css"]
+    }
+  ],
+  "action": {
+    "default_title": "LinguaContext"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuavxrlTn41BrgmJfQ58rpEtUva3DQ2JYN4fUROlRQLYS8CzKuxES2vEqTq/ufNsbf4ULs8rC6FSy3Zb/TSHWa4M8J0aVJjJQIJHABEh6JvxPxtCWTyuXdspv4piNF63XKlxVXLaf1ofSeqQ3bAxc/wqSBjxWlrjk6NG/2pe9BjDLqz9WzMEIMQdEgCkrwVuojEU6oTaSchIM2wfbv5XhDCmmH2dYYYPtnc+qplqSUs9y1Vj5rh54aN0cClPulRz7tbcc9OneZDiuF6RRui06ekol0RJysU6XkQH/LfjOggNBNgMEIZXdu4Cahamks5WQkcovT+EG6sy/VbjCl1qQLQIDAQAB"
+}

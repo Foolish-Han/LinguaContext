@@ -1,0 +1,5 @@
+api-key:sk-6aba1083f31349a79338f4ee11b312f3
+baseurl:https://dashscope.aliyuncs.com/compatible-mode/v1
+model-name:qwen-plus
+doubao-accessKey:lVRSYXT6Yi2aeq4rzG6QT78qGqFzC_pR
+doubao-app-id:6311772882

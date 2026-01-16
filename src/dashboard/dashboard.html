@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinguaContext - 生词本</title>
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+    <div class="container">
+        <!-- App Header (Fixed) -->
+        <header class="app-header">
+            <div class="logo-section">
+                <span class="app-logo">📚</span>
+                <span class="app-name">LinguaContext</span>
+            </div>
+            <div id="app-controls" class="app-controls">
+                <span id="sync-status" class="sync-status hidden"></span>
+                <button id="sync-btn" class="secondary-btn">☁️ 同步</button>
+                <button id="settings-btn" class="icon-btn" title="设置">⚙️</button>
+            </div>
+        </header>
+        
+        <!-- List View -->
+        <div id="list-view" class="view-section">
+            <div class="view-header">
+                <h2>我的生词本</h2>
+                <p id="stats">已收藏 0 个生词</p>
+            </div>
+            <div id="word-list" class="list-container">
+                <!-- Items will be injected here -->
+            </div>
+            <div id="empty-state" class="empty-state hidden">
+                <h3>暂无收藏</h3>
+                <p>在任意网页选中文字并点击 LC 图标即可学习并收藏。</p>
+            </div>
+        </div>
+
+        <!-- Detail View -->
+        <div id="detail-view" class="view-section hidden">
+             <div class="detail-nav">
+                 <button id="back-btn" class="nav-btn">← 返回列表</button>
+                 <div class="nav-controls">
+                     <button id="prev-btn" class="nav-btn" disabled>← 上一个</button>
+                     <button id="next-btn" class="nav-btn" disabled>下一个 →</button>
+                 </div>
+             </div>
+             
+             <div class="word-hero">
+                 <h1 id="detail-word">Word</h1>
+                 <button id="detail-play-btn" class="action-btn" title="朗读">
+                    <span class="icon">🔊</span> 朗读
+                 </button>
+             </div>
+
+             <div id="detail-content" class="detail-content">
+                 <!-- Full Markdown content will be injected here -->
+             </div>
+        </div>
+
+        <!-- Settings View -->
+        <div id="settings-view" class="view-section hidden">
+            <div class="detail-nav">
+                <button id="settings-back-btn" class="nav-btn">← 返回列表</button>
+                <h2>设置</h2>
+            </div>
+            <div class="settings-content">
+                <!-- Shortcut Settings -->
+                <div class="settings-section">
+                    <h3>⌨️ 快捷键与交互</h3>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="shortcuts-enabled">
+                        <label for="shortcuts-enabled">启用键盘快捷键 (选中文字后)</label>
+                    </div>
+                    
+                    <div class="shortcut-inputs" id="shortcut-inputs-container">
+                        <div class="form-group inline">
+                            <label>解释 (Explain):</label>
+                            <input type="text" id="shortcut-explain" class="shortcut-key" readonly placeholder="按下按键...">
+                        </div>
+                        <div class="form-group inline">
+                            <label>朗读 (TTS):</label>
+                            <input type="text" id="shortcut-play" class="shortcut-key" readonly placeholder="按下按键...">
+                        </div>
+                    </div>
+
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="show-buttons">
+                        <label for="show-buttons">显示悬浮按钮 (选中文字后)</label>
+                    </div>
+                </div>
+
+                <hr class="settings-divider">
+
+                <!-- Prompt Settings -->
+                <div class="settings-section">
+                    <h3>🧠 AI 设定</h3>
+                    <div class="form-group">
+                        <label for="custom-prompt">自定义 AI 提示词 (System Prompt)</label>
+                        <p class="form-hint">自定义 AI 助手的角色设定和输出格式。留空则使用默认配置。</p>
+                        <textarea id="custom-prompt" rows="10" placeholder="你是一个..."></textarea>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button id="save-settings-btn" class="primary-btn">保存设置</button>
+                    <button id="reset-settings-btn" class="secondary-btn">恢复默认</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conflict Resolution Modal -->
+        <div id="conflict-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h3>⚠️ 提示词同步冲突</h3>
+                <p>检测到本地提示词与云端备份不一致，请选择保留版本：</p>
+                
+                <div class="conflict-comparison">
+                    <div class="conflict-side">
+                        <h4>💻 本地版本</h4>
+                        <pre id="local-prompt-preview"></pre>
+                        <button id="keep-local-btn" class="primary-btn">保留本地</button>
+                    </div>
+                    <div class="conflict-side">
+                        <h4>☁️ 云端版本</h4>
+                        <pre id="cloud-prompt-preview"></pre>
+                        <button id="keep-cloud-btn" class="secondary-btn">使用云端</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- General Confirmation Modal -->
+        <div id="confirm-modal" class="modal-overlay hidden" style="z-index: 2000;">
+            <div class="modal-content small-modal">
+                <h3 id="confirm-title">确认操作</h3>
+                <p id="confirm-message">确定要执行此操作吗？</p>
+                <div class="modal-actions">
+                    <button id="confirm-cancel-btn" class="secondary-btn">取消</button>
+                    <button id="confirm-ok-btn" class="primary-btn danger-btn">确定</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast hidden">提示信息</div>
+    </div>
+    <script type="module" src="dashboard.js"></script>
+</body>
+</html>
