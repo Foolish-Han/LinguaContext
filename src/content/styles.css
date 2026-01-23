@@ -1,4 +1,14 @@
-:root {
+:host {
+  all: initial;
+  display: block;
+  z-index: 2147483647;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: visible;
+
   /* Dark Theme Variables */
   --lc-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --lc-bg-color: #1c1c1e; /* Dark background */
@@ -46,6 +56,7 @@
   color: var(--lc-accent-color);
   border: 1px solid var(--lc-border-color);
   transition: transform 0.2s ease, background-color 0.2s ease;
+  box-sizing: border-box;
 }
 
 .lc-trigger-btn:hover {
@@ -64,7 +75,7 @@
   position: absolute;
   width: 450px;
   min-height: 200px;
-  max-height: 600px;
+  max-height: 80vh; /* Use viewport height to ensure it fits */
   background-color: var(--lc-bg-color);
   border-radius: var(--lc-border-radius);
   box-shadow: var(--lc-shadow);

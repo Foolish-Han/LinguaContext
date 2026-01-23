@@ -70,7 +70,60 @@ async function init() {
   }
 
   // Attempt silent sync on load to check status
-  triggerSync(false);
+  // Only sync if local is empty (Initialization)
+  try {
+    const { savedWords = {} } =
+      await chrome.storage.local.get("savedWords");
+
+    // Check if we have any ACTIVE words (filter out soft-deleted ones)
+    const activeCount = Object.values(savedWords).filter(
+      (w) => !w.isDeleted,
+    ).length;
+
+    // Treat as "Empty" if no savedWords object OR no keys OR no active words
+    if (
+      !savedWords ||
+      Object.keys(savedWords).length === 0 ||
+      activeCount === 0
+    ) {
+      // Init Mode: Try to restore from cloud
+
+      // Update UI to show we are checking cloud (visual feedback is important)
+      const emptyState =
+        document.getElementById("empty-state");
+      if (emptyState) {
+        emptyState.classList.remove("hidden");
+        // Use a spinner or text to indicate loading
+        emptyState.innerHTML =
+          '<div class="loading-spinner"></div><p>正在检查云端备份...</p>';
+      }
+
+      console.log(
+        "Local storage effectively empty. Triggering Auto-PULL...",
+      );
+      await triggerSync(false, "PULL");
+
+      // Reset empty state text if still empty after sync
+      if (emptyState) {
+        // Check again
+        const { savedWords: newWords = {} } =
+          await chrome.storage.local.get("savedWords");
+        const newActiveCount = Object.values(
+          newWords,
+        ).filter((w) => !w.isDeleted).length;
+        if (newActiveCount === 0) {
+          emptyState.textContent =
+            "还没有生词，快去网页划词添加吧！";
+        }
+      }
+    } else {
+      console.log(
+        `Local storage has ${activeCount} active words. Skipping Auto-PULL.`,
+      );
+    }
+  } catch (e) {
+    console.error("Init sync check failed", e);
+  }
 
   await loadWords();
 }
@@ -117,7 +170,10 @@ async function loadWords() {
   try {
     const { savedWords = {} } =
       await chrome.storage.local.get("savedWords");
-    allWords = Object.values(savedWords);
+    // Filter out soft-deleted words
+    allWords = Object.values(savedWords).filter(
+      (w) => !w.isDeleted,
+    );
 
     // Sort by timestamp descending (newest first)
     allWords.sort((a, b) => b.timestamp - a.timestamp);
@@ -255,6 +311,11 @@ async function showSettings() {
     settings.shortcuts?.play || "p";
   document.getElementById("show-buttons").checked =
     settings.showButtons ?? true;
+  // Explicitly check for autoPlayTTS property, default to true if undefined
+  document.getElementById("auto-play-tts").checked =
+    settings.autoPlayTTS ??
+    CONFIG.DEFAULT_SETTINGS.autoPlayTTS ??
+    true;
 }
 
 /* --- Toast & Confirm Utilities --- */
@@ -313,6 +374,8 @@ async function saveSettings() {
     document.getElementById("shortcut-play").value;
   const showButtons =
     document.getElementById("show-buttons").checked;
+  const autoPlayTTS =
+    document.getElementById("auto-play-tts").checked;
 
   const newSettings = {
     customPrompt: prompt,
@@ -322,20 +385,34 @@ async function saveSettings() {
       play: shortcutPlay,
     },
     showButtons: showButtons,
+    autoPlayTTS: autoPlayTTS,
+    updatedAt: Date.now(), // Add timestamp for sync
   };
 
-  // Save to Local Storage
-  await chrome.storage.local.set({
-    userSettings: newSettings,
-    customPrompt: prompt, // Keep legacy for safety
-  });
+  // Save to Local Storage via Service Worker (Mutex Protected)
+  chrome.runtime.sendMessage(
+    {
+      action: "SAVE_SETTINGS",
+      settings: newSettings,
+    },
+    (response) => {
+      if (
+        chrome.runtime.lastError ||
+        !response ||
+        !response.success
+      ) {
+        console.error(
+          "Save settings failed:",
+          chrome.runtime.lastError || response?.error,
+        );
+        showToast("设置保存失败，请重试");
+        return;
+      }
 
-  showToast("设置已保存！");
-  showList();
-
-  // Trigger background sync to push changes
-  // Not strictly required to block UI, can run in background
-  triggerSync(false);
+      showToast("设置已保存！");
+      showList();
+    },
+  );
 }
 
 async function resetSettings() {
@@ -343,21 +420,42 @@ async function resetSettings() {
     "恢复默认设置",
     "确定要恢复默认设置吗？这将覆盖您的自定义提示词和快捷键配置。",
     async () => {
-      await chrome.storage.local.remove([
-        "userSettings",
-        "customPrompt",
-      ]);
-      // Re-populate with defaults
-      document.getElementById("custom-prompt").value = "";
-      document.getElementById("shortcuts-enabled").checked =
-        true;
-      document.getElementById("shortcut-explain").value =
-        "e";
-      document.getElementById("shortcut-play").value = "p";
-      document.getElementById("show-buttons").checked =
-        true;
+      // Reset via Service Worker (Mutex Protected)
+      chrome.runtime.sendMessage(
+        { action: "RESET_SETTINGS" },
+        (response) => {
+          if (
+            chrome.runtime.lastError ||
+            !response ||
+            !response.success
+          ) {
+            console.error(
+              "Reset settings failed:",
+              chrome.runtime.lastError || response?.error,
+            );
+            showToast("重置失败，请重试");
+            return;
+          }
 
-      showToast("已恢复默认设置！");
+          // Re-populate with defaults
+          document.getElementById("custom-prompt").value =
+            "";
+          document.getElementById(
+            "shortcuts-enabled",
+          ).checked = true;
+          document.getElementById(
+            "shortcut-explain",
+          ).value = "e";
+          document.getElementById("shortcut-play").value =
+            "p";
+          document.getElementById("show-buttons").checked =
+            true;
+          document.getElementById("auto-play-tts").checked =
+            true;
+
+          showToast("已恢复默认设置！");
+        },
+      );
     },
   );
 }
@@ -456,28 +554,39 @@ async function deleteWord(id) {
     "确定要删除这个生词吗？此操作无法撤销。",
     async () => {
       try {
-        const { savedWords = {} } =
-          await chrome.storage.local.get("savedWords");
-        if (savedWords[id]) {
-          delete savedWords[id];
-          await chrome.storage.local.set({ savedWords });
+        // We use the runtime message to handle deletion to ensure logic consistency (soft delete)
+        chrome.runtime.sendMessage(
+          { action: "REMOVE_WORD", wordId: id },
+          async (response) => {
+            if (response && response.success) {
+              // Remove from local array UI immediately
+              allWords = allWords.filter(
+                (w) => w.id !== id,
+              );
+              updateStats(allWords.length);
 
-          // Remove from local array
-          allWords = allWords.filter((w) => w.id !== id);
-          updateStats(allWords.length);
+              // If in detail view and deleting current word, go back to list
+              const urlParams = new URLSearchParams(
+                window.location.search,
+              );
+              if (urlParams.get("id") === id) {
+                showList();
+              }
 
-          // If in detail view and deleting current word, go back to list
-          const urlParams = new URLSearchParams(
-            window.location.search,
-          );
-          if (urlParams.get("id") === id) {
-            showList();
-          }
+              // Re-render list
+              renderList(allWords);
+              showToast("生词已删除");
 
-          // Re-render list
-          renderList(allWords);
-          showToast("生词已删除");
-        }
+              // Trigger sync to propagate deletion (PUSH MODE)
+              triggerSync(false, "PUSH");
+            } else {
+              showToast(
+                "删除失败: " +
+                  (response?.error || "未知错误"),
+              );
+            }
+          },
+        );
       } catch (error) {
         console.error("Failed to delete word:", error);
         showToast("删除失败: " + error.message);
@@ -533,78 +642,96 @@ function playTTS(text) {
 
 let conflictData = null;
 
-function triggerSync(interactive) {
-  const btn = document.getElementById("sync-btn");
-  const status = document.getElementById("sync-status");
+// Add syncMode parameter
+function triggerSync(
+  interactive = false,
+  syncMode = "PUSH",
+) {
+  return new Promise((resolve) => {
+    const btn = document.getElementById("sync-btn");
+    const status = document.getElementById("sync-status");
 
-  if (interactive) {
-    btn.textContent = "正在同步...";
-    btn.disabled = true;
-  }
+    if (interactive) {
+      btn.innerHTML =
+        '<span class="loading"></span> 同步中...';
+      btn.disabled = true;
+      // Interactive sync implies PULL (Restore/Merge)
+      syncMode = "PULL";
+    }
 
-  chrome.runtime.sendMessage(
-    { action: "SYNC_DATA", interactive: interactive },
-    (response) => {
-      if (chrome.runtime.lastError) {
-        // Often means "The user did not approve access" if interactive=true
-        if (interactive) {
-          status.textContent = "同步取消或失败";
-          status.className = "sync-status error";
-          status.classList.remove("hidden");
-          btn.textContent = "☁️ 登录 Google Drive 同步";
-          btn.disabled = false;
-          console.warn(
-            "Sync Error:",
-            chrome.runtime.lastError,
-          );
-        }
-        return;
-      }
-
-      if (response && response.success) {
-        // Check for settings conflict (was promptConflict)
-        if (response.settingsConflict) {
+    chrome.runtime.sendMessage(
+      {
+        action: "SYNC_DATA",
+        interactive: interactive,
+        syncMode,
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          // Often means "The user did not approve access" if interactive=true
           if (interactive) {
-            showConflictModal(response.settingsConflict);
-          } else {
-            // Silent sync conflict: Just show indicator, don't interrupt
-            status.textContent = `同步完成 (发现配置冲突)`;
-            status.className = "sync-status error"; // Use error color to attract attention
+            status.textContent = "同步取消或失败";
+            status.className = "sync-status error";
             status.classList.remove("hidden");
-          }
-        } else {
-          status.textContent = `上次同步: ${new Date().toLocaleTimeString()} (共${response.count}条)`;
-          status.className = "sync-status success";
-          status.classList.remove("hidden");
-        }
-
-        btn.textContent = "🔄 立即同步";
-        btn.classList.add("synced");
-        btn.disabled = false;
-
-        // Reload list to show merged data
-        loadWords();
-      } else {
-        // Failed
-        if (interactive) {
-          status.textContent = `同步失败: ${response?.error || "未知错误"}`;
-          status.className = "sync-status error";
-          status.classList.remove("hidden");
-          btn.textContent = "☁️ 登录 Google Drive 同步";
-          btn.disabled = false;
-
-          if (response?.error?.includes("OAuth")) {
-            showToast(
-              "Google 登录失败，请检查 manifest.json 中的 Client ID 配置。",
+            btn.textContent = "☁️ 登录 Google Drive 同步";
+            btn.disabled = false;
+            console.warn(
+              "Sync Error:",
+              chrome.runtime.lastError,
             );
           }
-        } else {
-          // Silent failure - just reset button
-          btn.textContent = "☁️ 登录 Google Drive 同步";
+          resolve({
+            success: false,
+            error: chrome.runtime.lastError.message,
+          });
+          return;
         }
-      }
-    },
-  );
+
+        if (response && response.success) {
+          // Check for settings conflict (was promptConflict)
+          if (response.settingsConflict) {
+            if (interactive) {
+              showConflictModal(response.settingsConflict);
+            } else {
+              // Silent sync conflict: Just show indicator, don't interrupt
+              status.textContent = `同步完成 (发现配置冲突)`;
+              status.className = "sync-status error"; // Use error color to attract attention
+              status.classList.remove("hidden");
+            }
+          } else {
+            status.textContent = `上次同步: ${new Date().toLocaleTimeString()} (共${response.count}条)`;
+            status.className = "sync-status success";
+            status.classList.remove("hidden");
+          }
+
+          btn.textContent = "🔄 立即同步";
+          btn.classList.add("synced");
+          btn.disabled = false;
+
+          // Reload list to show merged data
+          loadWords();
+        } else {
+          // Failed
+          if (interactive) {
+            status.textContent = `同步失败: ${response?.error || "未知错误"}`;
+            status.className = "sync-status error";
+            status.classList.remove("hidden");
+            btn.textContent = "☁️ 登录 Google Drive 同步";
+            btn.disabled = false;
+
+            if (response?.error?.includes("OAuth")) {
+              showToast(
+                "Google 登录失败，请检查 manifest.json 中的 Client ID 配置。",
+              );
+            }
+          } else {
+            // Silent failure - just reset button
+            btn.textContent = "☁️ 登录 Google Drive 同步";
+          }
+        }
+        resolve(response);
+      },
+    );
+  });
 }
 
 function showConflictModal(conflict) {

@@ -54,5 +54,6 @@ export const CONFIG = {
       play: "p",
     },
     showButtons: true,
+    autoPlayTTS: true,
   },
 };

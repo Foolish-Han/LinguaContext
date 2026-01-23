@@ -1,61 +1,59 @@
-# LinguaContext
+# LinguaContext - Immersive English Learning Assistant
 
-**LinguaContext** 是一个基于 AI 的沉浸式英语学习 Chrome 扩展。它通过智能分析单词在当前网页中的**语境 (Context)**，提供精准的释义、例句和发音，并支持一键收藏到生词本和云端同步。
+LinguaContext is a Chrome Extension designed to help users learn English vocabulary in context. Unlike traditional dictionaries, it captures the **sentence context** where you found the word, uses AI to generate context-aware explanations, and provides high-quality TTS pronunciation.
 
-## 🚀 核心功能
+## ✨ Key Features
 
-*   **语境感知解释**: AI 根据选中单词所在的句子提供释义，拒绝生搬硬套。
-*   **流式响应**: 像 ChatGPT 一样实时显示 AI 的思考过程。
-*   **神经语音 TTS**: 高质量的美式/英式发音朗读。
-*   **生词本 Dashboard**: 现代化的管理面板，复习时可查看**原文语境**。
-*   **云端同步**: 支持 Google Drive 同步，多设备数据一致。
-*   **高度定制**: 支持自定义 AI Prompt 和快捷键。
+- **Context-Aware Definitions**: Captures the surrounding sentence when you select a word, providing explanations relevant to the specific usage scenario.
+- **AI-Powered Insights**: Uses advanced LLMs (Doubao/Ark) to generate comprehensive word cards including definitions, IPA phonetics, and example sentences.
+- **Natural TTS Pronunciation**: High-quality neural text-to-speech engine (Volcengine) for accurate pronunciation.
+- **Smart UI Isolation**: Built with **Shadow DOM** technology to ensure the extension's popup and buttons look perfect on any website (e.g., ClickUp, Notion) without style conflicts.
+- **Vocabulary Dashboard**: A dedicated dashboard to review your saved words, filter by date, and manage your learning progress.
+- **Cloud Sync**: Syncs your vocabulary and settings across devices using **Google Drive**, featuring a robust "Local Master" strategy with conflict resolution.
 
-## 🛠️ 安装指南 (开发者模式)
+## 🛠 Technical Architecture
 
-由于本项目尚未发布到 Chrome Web Store，你需要通过“加载已解压的扩展程序”来安装。
+This extension is built on **Manifest V3** standards.
 
-### 前置准备
+- **Core**:
+  - **Service Worker**: Handles all backend logic, API requests, and data synchronization.
+  - **Mutex Concurrency Control**: Implements a custom Mutex lock to ensure atomic operations on local storage and sync processes, preventing race conditions.
+- **UI & Interaction**:
+  - **Shadow DOM**: Content scripts inject UI elements into a Shadow Root, isolating extension styles from the host page CSS.
+  - **Offscreen Document**: Handles audio playback (TTS) to comply with Chrome's Service Worker limitations.
+- **Data & Sync**:
+  - **Storage**: `chrome.storage.local` for local persistence.
+  - **Sync Strategy**: Implements a "Soft Delete" mechanism and a Push/Pull sync protocol to manage data consistency between local storage and Google Drive.
 
-1.  **获取源码**: 克隆或下载本项目到本地。
-2.  **配置 API Key**:
-    *   本项目依赖 **Volcengine (火山引擎)** 的 LLM 和 TTS 服务。
-    *   打开 `src/config/config.js` 文件。
-    *   将 `API_KEY` 替换为你自己的火山引擎 API Key。
-    *   *(可选)* 配置 `GOOGLE_CLIENT_ID` 用于 Google Drive 同步（需在 Google Cloud Console 申请）。
-    *   **⚠️ 注意**: 目前 Google Drive API 处于测试阶段 (Testing Mode)。如需使用同步功能，请联系开发者将您的 Google 邮箱加入白名单，否则无法授权登录。
+## 🚀 Installation
 
-### 安装步骤
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/yourusername/LinguaContext.git
+    ```
+2.  **Open Chrome Extensions**:
+    - Navigate to `chrome://extensions/`
+    - Enable **Developer mode** (top right toggle).
+3.  **Load Unpacked**:
+    - Click **Load unpacked**.
+    - Select the root directory of this project (`LinguaContext`).
 
-1.  打开 Chrome 浏览器。
-2.  在地址栏输入 `chrome://extensions/` 并回车。
-3.  **开启开发者模式**:
-    *   在页面右上角，找到 **"开发者模式" (Developer mode)** 开关并打开。
-4.  **加载扩展**:
-    *   点击左上角的 **"加载已解压的扩展程序" (Load unpacked)** 按钮。
-    *   在弹出的文件选择窗口中，选择本项目所在的**根目录** (`LinguaContext` 文件夹)。
-5.  **完成**:
-    *   此时你应该能在扩展列表中看到 "LinguaContext"。
-    *   浏览器工具栏会出现一个小图标（可能需要点击拼图图标将其固定）。
+## ⚙️ Configuration
 
-## 📖 使用说明
+The project uses `src/config/config.js` for API configurations.
+*Note: You may need to replace the API keys with your own credentials for production use.*
 
-1.  **浏览网页**: 打开任意英文网页（例如 BBC, CNN, TechCrunch）。
-2.  **划词**: 选中一个单词或短语。
-3.  **解释**: 点击悬浮的 📖 图标，或按下快捷键 `e`。
-4.  **朗读**: 点击悬浮的 🔊 图标，或按下快捷键 `p`。
-5.  **生词本**: 点击浏览器右上角的扩展图标进入 Dashboard。
+## 📝 Usage
 
-## 🏗️ 技术架构
+1.  **Select & Explain**: Highlight any text on a webpage. Click the **📖** icon to get an AI explanation or **🔊** to hear pronunciation.
+2.  **Pin Window**: Click the **📌** pin icon to keep the explanation window fixed on the screen while you scroll.
+3.  **Save Word**: Click the **☆** star icon to save the word and its context to your vocabulary list.
+4.  **Dashboard**: Click the extension icon in the browser toolbar to open the Dashboard for review and settings.
 
-*   **Manifest V3**: 最新 Chrome 扩展标准。
-*   **Service Worker**: 后台任务处理与消息路由。
-*   **Offscreen Document**: 音频播放解决方案。
-*   **Native DOM Injection**: 无侵入式 UI 渲染。
+## 🤝 Contributing
 
-详细文档请参阅 `docs/` 目录：
-*   [产品手册 (Product Manual)](docs/product_manual.md)
-*   [技术架构 (Architecture)](docs/architecture.md)
+Contributions are welcome! Please feel free to submit a Pull Request.
 
----
-**License**: MIT
+## 📄 License
+
+[MIT License](LICENSE)
